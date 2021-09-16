@@ -7,9 +7,9 @@ import numpy as np
 
 
 
-class DQNNet_siren(nn.Module):
+class DQNetwork(nn.Module):
     def __init__(self, input_size, output_size, B, lr=1e-3):
-        super(DQNNet_siren, self).__init__()
+        super(DQNetwork, self).__init__()
         self.B = B
         self.B = torch.tensor(B, requires_grad=False)
         

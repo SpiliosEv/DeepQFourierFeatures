@@ -8,11 +8,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 from ReplayMemory import ReplayMemory
 import Environment
-from Siren_network import DQNNet_siren
+from DeepQNetwork import DQNetwork
 import matplotlib.pyplot as plt
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # initialize a device
 
 
 if __name__ ==  '__main__':
@@ -21,7 +21,7 @@ if __name__ ==  '__main__':
     parser.add_argument('--mem_capacity', type=int, default=3000, help='the overall capacity of the Memory Replay')
     parser.add_argument('--initial_mem_capacity', type=int, default=300, help='the initial capacity of the Memory Replay')
     parser.add_argument('--num_train_eps', type=int, default=300, help='the number of the training episodes')
-    parser.add_argument('--lr', type=int, default=1e-3, help='learning rate')
+    parser.add_argument('--lr', type=int, default=1e-4, help='learning rate')
     parser.add_argument('--batch_size', type=int, default=64, help='size of the batch')
     
 
@@ -78,9 +78,13 @@ if __name__ ==  '__main__':
     initial_capacity = arguments.initial_mem_capacity
     f_maps = np.load(r"C:\Users\Spilios\OneDrive\Desktop\DQL_FFM\f_maps.npy")
     g_maps = np.load(r"C:\Users\Spilios\OneDrive\Desktop\DQL_FFM\g_maps.npy")
+    
+    """  
+    First we initialize the Replay Memory with experiences-tuples from some random trajectories
+    """
 
     for k in range(arguments.memory_fill_eps):
-        current_position = np.array([[19,10],[18,10],[15,17]])
+        current_position = np.array([[19,10],[18,10],[15,17]]) # This is the positions for the relays at the beginning of every episode
         for i in range(initial_capacity):
             new_relay_pos = np.zeros([numRelays,2], dtype=np.int)
 
@@ -98,7 +102,9 @@ if __name__ ==  '__main__':
                     
                 new_relay_pos[r,:] = temp_relay_pos
                 action.append(temp_action)
-            
+            """  
+            Calculate the contribution of every relay to the SINR (reward for every relay-agent)
+            """
             reward_relay1 = Environment.VI_local(f_maps[new_relay_pos[0][0],new_relay_pos[0][1],i],g_maps[new_relay_pos[0][0],new_relay_pos[0][1],i])
             reward_relay2 = Environment.VI_local(f_maps[new_relay_pos[1][0],new_relay_pos[1][1],i],g_maps[new_relay_pos[1][0],new_relay_pos[1][1], i])
             reward_relay3 = Environment.VI_local(f_maps[new_relay_pos[2][0],new_relay_pos[2][1],i],g_maps[new_relay_pos[2][0],new_relay_pos[2][1],i])
@@ -109,8 +115,9 @@ if __name__ ==  '__main__':
             memory.store (current_position,action,new_relay_pos,reward)
             current_position = new_relay_pos
             
+            
     
-    sigma = 1e-3
+    sigma = 2e-3
     B = np.random.normal(0.,sigma,size = (4,2))
     B = torch.from_numpy(B)
     B = torch.tensor(B, dtype = torch.float)
@@ -123,8 +130,8 @@ if __name__ ==  '__main__':
     lr = arguments.lr
     Rinit_pos = np.array([[9,3],[9,2],[9,4]])
     
-    policy_net = DQNNet_siren(Rinit_pos[0].size, action_size, B, lr).to(device)
-    target_net = DQNNet_siren(Rinit_pos[0].size, action_size, B, lr).to(device)
+    policy_net = DQNetwork(Rinit_pos[0].size, action_size, B, lr).to(device)
+    target_net = DQNetwork(Rinit_pos[0].size, action_size, B, lr).to(device)
     target_net.eval()
     policy_net.train()
     batch_size = arguments.batch_size
@@ -141,19 +148,20 @@ if __name__ ==  '__main__':
         state = np.array([[9,3],[9,2],[9,4]]) # we begin from the same position after every episode
         reward_per_episode = 0
         for j in range(400): # 400 time slots in every episode
-            print(epsilon)
             # movement
-            #print(state)
             currentState = np.ravel_multi_index( state.T, (rMap_RowCells, rMap_ColCells) )
             action = []
             new_relay_pos = np.zeros([numRelays,2], dtype=np.int) 
             for r in range(numRelays):
                 drawNum = np.random.rand()
-                if drawNum <= epsilon:
+                if drawNum <= epsilon: # for a small percentage of the time we pick an action randomly for maintaining exploration and to avoid local minima in the policy
                     valid_actions = validMoves[currentState[r]]
                     temp_action = random.choice(valid_actions)
                     temp_relay_pos = state[r,:] + np.array(actionSpace[temp_action])
                     
+                    """ 
+                    We check if the action chosen is valid for the relay position - check if the next position is within the grid boundaries
+                    """
                     while (temp_relay_pos == new_relay_pos[0:r]).all(1).any():
                         temp_action = random.choice(valid_actions)
                         temp_relay_pos = state[r,:] + np.array(actionSpace[temp_action])
@@ -177,9 +185,9 @@ if __name__ ==  '__main__':
                     elif r == 2:
                         with torch.no_grad():
                             action_choice = policy_net.forward(input_relay)
-                    print(action_choice.shape)
+                    action_choice = action_choice.view(-1,9)
+                    action_choice = action_choice*torch.tensor([0.999,0.999,0.999,0.999,1,0.999,0.999,0.999,0.999]).to(device) #subtract a small percentage for all the actions
                     action_choice = action_choice.view(-1)
-                    #action_choice = action_choice*torch.tensor([0.999,0.999,0.999,0.999,1,0.999,0.999,0.999,0.999]).to(device)
                     action_index = torch.argmax(action_choice).item()
                     action_chosen = candidateActions[action_index]
                     valid_actions = validMoves[currentState[r]] 
@@ -200,10 +208,14 @@ if __name__ ==  '__main__':
                     new_relay_pos[r,:] = temp_relay_pos 
                     action.append(action_chosen)
                     print(action_chosen)
-            print(new_relay_pos)
+            # at this point we have calculated the action and new state for every relay
+            print(new_relay_pos) # we print the new state (position)
             reward_relay1 = Environment.VI_local(f_maps[new_relay_pos[0][0],new_relay_pos[0][1],j],g_maps[new_relay_pos[0][0],new_relay_pos[0][1],j])
             reward_relay2 = Environment.VI_local(f_maps[new_relay_pos[1][0],new_relay_pos[1][1],j],g_maps[new_relay_pos[1][0],new_relay_pos[1][1],j])
             reward_relay3 = Environment.VI_local(f_maps[new_relay_pos[2][0],new_relay_pos[2][1],j],g_maps[new_relay_pos[2][0],new_relay_pos[2][1],j])
+            """
+            At this point, for all relays we have calculated the action, the new state and the reward (contribution to the SINR)
+            """
             reward = []
             reward.append(reward_relay1)
             reward.append(reward_relay2)
@@ -212,10 +224,12 @@ if __name__ ==  '__main__':
             print(reward_slot)
             reward_per_episode = reward_per_episode + reward_slot
             accumulated_reward.append(reward_slot)
-            memory.store(state,action,new_relay_pos,reward)
-            state = new_relay_pos
+            memory.store(state,action,new_relay_pos,reward) # store the experience- tuple to the Replay Memory
+            state = new_relay_pos # set the new state to be the current state
             
-
+            """ 
+            We sample a batch of experiences for the Deep Q Network weight update (gradient descent)
+            """
             indices_to_sample = random.sample(range(len(memory.buffer_state)), batch_size)
             states = [memory.buffer_state[i] for i in indices_to_sample]
             action_sample = [memory.buffer_action[i] for i in indices_to_sample]
@@ -255,7 +269,6 @@ if __name__ ==  '__main__':
             states_relay1 = torch.tensor(states_relay1, dtype = torch.float32)
             states_relay1 = states_relay1.to(device)
             actions = actions.to(device)
-            #print(actions.unsqueeze(-1).shape)
             actions = torch.tensor(actions, dtype = torch.int64)
             q_pred = policy_net.forward(states_relay1).gather(1, actions)
             
@@ -269,33 +282,29 @@ if __name__ ==  '__main__':
 
             y_j = torch.tensor(y_j, dtype=torch.float32)
 
-
+            """ Learning with gradient descent 
+            """
             policy_net.optimizer.zero_grad()
             loss = F.mse_loss(y_j, q_pred).mean()
             loss.backward()
             policy_net.optimizer.step()
             
-            
-            
-            
-            
             if j % update_frequency == 0:
-                target_net.load_state_dict(policy_net.state_dict()) # update target network for relay1
+                target_net.load_state_dict(policy_net.state_dict()) # copy the weights of the Q Network to the Target Network 
 
 
             if j % update_epsilon_frequency == 0:
                 epsilon = max(epsilon_min, epsilon*epsilon_decay)
         
         print("this is the end of episode", ep_cnt)
-        reward_per_episode_list.append(reward_per_episode)
-                
-
-    
-    
+        reward_per_episode_list.append(reward_per_episode)   
+        
+        
+    """ 
+    Plotting the average SINR at the destination for every episode
+    """  
     reward_per_episode_list1 = np.array(reward_per_episode_list)
     k = reward_per_episode_list1.size
-
-    
 
     a = [i for i in range(k)]
 
@@ -306,18 +315,5 @@ if __name__ ==  '__main__':
 
     plt.plot(a,results)
     plt.show()
-    
-    
-                    
-
-
-    
-    
-    
-    
-        
-    
-    
-    
             
             
