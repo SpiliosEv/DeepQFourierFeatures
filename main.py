@@ -1,3 +1,28 @@
+"""
+*************************************************************************************************************
+Version
+    Last revision: October 2021
+    Author: Spilios Evmorfos
+
+Purpose
+    The purpose of this code is to support the paper:
+    S. Evmorfos, K. Diamantaras, A. Petropulu, Deep Q Learning With Fourier Feature Mapping For Mobile Relay Beamforming Networks,
+    International Conference on Signal Processing Advances in Wireless Communications (SPAWC), 2021
+
+   Any part of this code used in your work should cite the above publication.
+
+This code is provided "as is" to support the ideals of reproducible research. Any issues with this
+code should be reported by email to spilios@rutgers.edu. 
+
+The code is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
+available at https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+*************************************************************************************************************
+"""
+
+
+
+
 import argparse
 import numpy as np  
 import torch 
