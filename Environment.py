@@ -1,4 +1,23 @@
-" The code for this file is created by Anastasios Dimas"
+"""
+*************************************************************************************************************
+Version
+    Last revision: October 2020
+    Author: Anastasios Dimas
+
+Purpose
+    The author of this code has granted permission for its use to support the paper:
+    S. Evmorfos, K. Diamantaras, A. Petropulu, Deep Q Learning With Fourier Feature Mapping For Mobile Relay Beamforming Networks,
+    International Conference on Signal Processing Advances in Wireless Communications (SPAWC), 2021
+
+This code is provided "as is" to support the ideals of reproducible research. Any issues with this
+code should be reported by email to tasos.dimas@rutgers.edu. However, no guarantees are being made
+that the reported issues will be eventually fixed.
+
+The code is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
+available at https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+*************************************************************************************************************
+"""
 
 import numpy as np 
 import scipy
